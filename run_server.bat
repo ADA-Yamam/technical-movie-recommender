@@ -1,47 +1,94 @@
-@echo off
-REM Movie Platform API Server Startup Script
-REM This batch file starts the FastAPI server for the movie recommendation system
 
-echo.
-echo ========================================
-echo   Movie Recommendation API Server
-echo ========================================
-echo.
+import sqlite3
 
-REM Check if Python is installed
-python --version >nul 2>&1
-if errorlevel 1 (
-    echo ERROR: Python is not installed or not in PATH
-    echo Please install Python 3.8+ and add it to your PATH
-    pause
-    exit /b 1
-)
+DB_PATH = "movies.db"
 
-REM Check if required packages are installed
-echo Checking dependencies...
-pip show fastapi >nul 2>&1
-if errorlevel 1 (
-    echo Installing required packages...
-    pip install -r requirements.txt
-)
 
-REM Check if database exists
-if not exist "movies.db" (
-    echo Database not found. Preparing database...
-    python prepare_db.py
-    echo.
-)
+def prepare_database():
+    conn = sqlite3.connect(DB_PATH)
+    cursor = conn.cursor()
 
-REM Start the API server
-echo.
-echo Starting FastAPI server...
-echo.
-echo API will be available at: http://127.0.0.1:8000
-echo Swagger UI: http://127.0.0.1:8000/docs
-echo.
-echo Press Ctrl+C to stop the server
-echo.
+    # Drop tables if they exist
+    cursor.execute("DROP TABLE IF EXISTS MovieGenres")
+    cursor.execute("DROP TABLE IF EXISTS Genres")
+    cursor.execute("DROP TABLE IF EXISTS Movies")
 
-uvicorn movie_platform_api:app --reload
+    # Create Movies table
+    cursor.execute("""
+    CREATE TABLE Movies (
+        MovieID INTEGER PRIMARY KEY AUTOINCREMENT,
+        Title TEXT NOT NULL,
+        ReleaseYear INTEGER,
+        Rating REAL
+    )
+    """)
 
-pause
+    # Create Genres table
+    cursor.execute("""
+    CREATE TABLE Genres (
+        GenreID INTEGER PRIMARY KEY AUTOINCREMENT,
+        GenreName TEXT NOT NULL
+    )
+    """)
+
+    # Create MovieGenres table (many-to-many)
+    cursor.execute("""
+    CREATE TABLE MovieGenres (
+        MovieID INTEGER,
+        GenreID INTEGER,
+        FOREIGN KEY (MovieID) REFERENCES Movies(MovieID),
+        FOREIGN KEY (GenreID) REFERENCES Genres(GenreID)
+    )
+    """)
+
+    # Insert Genres
+    genres = [
+        ("Action",),
+        ("Drama",),
+        ("Comedy",),
+        ("Sci-Fi",),
+        ("Thriller",)
+    ]
+    cursor.executemany(
+        "INSERT INTO Genres (GenreName) VALUES (?)",
+        genres
+    )
+
+    # Insert Movies
+    movies = [
+        ("Inception", 2010, 8.8),
+        ("The Dark Knight", 2008, 9.0),
+        ("Interstellar", 2014, 8.6),
+        ("The Matrix", 1999, 8.7),
+        ("Gladiator", 2000, 8.5)
+    ]
+    cursor.executemany(
+        "INSERT INTO Movies (Title, ReleaseYear, Rating) VALUES (?, ?, ?)",
+        movies
+    )
+
+    # Link Movies to Genres
+    movie_genres = [
+        (1, 4),  # Inception -> Sci-Fi
+        (2, 1),  # Dark Knight -> Action
+        (2, 5),  # Dark Knight -> Thriller
+        (3, 4),  # Interstellar -> Sci-Fi
+        (4, 4),  # Matrix -> Sci-Fi
+        (5, 1),  # Gladiator -> Action
+        (5, 2)   # Gladiator -> Drama
+    ]
+    cursor.executemany(
+        "INSERT INTO MovieGenres (MovieID, GenreID) VALUES (?, ?)",
+        movie_genres
+    )
+
+    conn.commit()
+    conn.close()
+
+    print("Database prepared successfully.")
+
+
+if __name__ == "__main__":
+    prepare_database()
+cd C:\New folder
+python prepare_db.py
